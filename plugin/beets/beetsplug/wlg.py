@@ -99,28 +99,27 @@ class WhatLastGenre(BeetsPlugin):
         try:
             for i, album in enumerate(albums, start=1):
                 self._log.info(whatlastgenre.progressbar(i, len(albums)))
+
+                if opts.dry:
+                    self._log.info(u'dry run for album {0}', album)
+
                 genres = self.genres(album, dry=opts.dry)
+
                 if album.genre != genres: 
-                    album.genre = genres
-                    if self.config['force'] or not opts.dry:
+                    if self.config['force'] and not opts.dry:
+                        self._log.info(u'forcing genre update for album {0}', album)
+                        album.genre = genres
                         album.store()
                         for item in album.items():
                             item.genre = genres
                             item.store()
                             if config['import']['write'].get(bool):
                                 item.try_write()
-                    else:
-                        if opts.dry:
-                            self._log.info(u'dry run for album {0}', album)
-                        elif not config['force']:
-                            self._log.info(u'not forcing genre update for album {0}', album)
-                        else:
-                            pass  #self._log.info(u'updated gen', album)
         except KeyboardInterrupt:
             pass
-
-        self.wlg.print_stats(i)
-        self.setdown()
+        finally:
+            self.wlg.print_stats(i)
+            self.setdown()
 
     def imported(self, _, task):
         """wlg during import"""
