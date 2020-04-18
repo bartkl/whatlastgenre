@@ -38,7 +38,7 @@ class WhatLastGenre(BeetsPlugin):
         self.config.add({
             'auto': False,
             'force': False,
-            'count': 4,
+            'count': 4,  # can be overridden with cli args
             'separator': ', ',
             'whitelist': 'wlg',  # wlg, beets or custom path
         })
@@ -58,7 +58,6 @@ class WhatLastGenre(BeetsPlugin):
             tag_limit=self.config['count'].get(int),
             update_cache=update_cache,
             verbose=verbose,
-            dry=False,
             difflib=False,
             release=False))
         conf.set('wlg', 'whitelist', str(whitelist))
@@ -77,10 +76,16 @@ class WhatLastGenre(BeetsPlugin):
             default=0, help='verbose output (-vv for debug)')
         cmds.parser.add_option(
             '-f', '--force', dest='force', action='store_true',
-            default=False, help='force overwrite existing genres')
+            default=False, help='force overwrite existing genres (default: False)')
+        cmds.parser.add_option(
+            '-n', '--dry', dest='dry', action='store_true',
+            default=False, help='don\'t save metadata (default: False)')
+        cmds.parser.add_option(
+            '-l', '--tag-limit', metavar='N', type=int, dest='count',
+            default=4, help='max. number of genre tags (default: 4)')
         cmds.parser.add_option(
             '-u', '--update-cache', dest='cache', action='store_true',
-            default=False, help='force update cache')
+            default=False, help='force update cache (default: False)')
         cmds.func = self.commanded
         return [cmds]
 
@@ -92,25 +97,34 @@ class WhatLastGenre(BeetsPlugin):
         if opts.force:
             self.config['force'] = True
 
+        self.wlg.conf.args.tag_limit = opts.count
+
         albums = lib.albums(decargs(args))
         i = 1
         try:
             for i, album in enumerate(albums, start=1):
                 self._log.info(whatlastgenre.progressbar(i, len(albums)))
-                genres = self.genres(album)
-                if album.genre != genres:
-                    album.genre = genres
-                    album.store()
-                    for item in album.items():
-                        item.genre = genres
-                        item.store()
-                        if config['import']['write'].get(bool):
-                            item.try_write()
+
+                if opts.dry:
+                    self._log.info(u'dry run for album {0}', album)
+
+                genres = self.genres(album, dry=opts.dry)
+
+                if album.genre != genres: 
+                    if self.config['force'] and not opts.dry:
+                        self._log.info(u'forcing genre update for album {0}', album)
+                        album.genre = genres
+                        album.store()
+                        for item in album.items():
+                            item.genre = genres
+                            item.store()
+                            if config['import']['write'].get(bool):
+                                item.try_write()
         except KeyboardInterrupt:
             pass
-
-        self.wlg.print_stats(i)
-        self.setdown()
+        finally:
+            self.wlg.print_stats(i)
+            self.setdown()
 
     def imported(self, _, task):
         """wlg during import"""
@@ -126,12 +140,15 @@ class WhatLastGenre(BeetsPlugin):
                     item.genre = genres
                     item.store()
 
-    def genres(self, album):
-        """Return the current genres of an album if they exist and
-        the force option is not set or get genres from whatlastgenre.
+    def genres(self, album, dry=False):
+        """Return the current genres of an album if:
+          - they exist; and
+          - the force option is not set; and
+          - the dry arg is not set
+
+        Otherwise, get genres from whatlastgenre.
         """
-        if album.genre and not self.config['force']:
-            self._log.info('not forcing genre update for album {0}', album)
+        if album.genre and not dry and not self.config['force']:
             return album.genre
 
         metadata = Metadata(
