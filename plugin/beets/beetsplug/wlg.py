@@ -38,7 +38,7 @@ class WhatLastGenre(BeetsPlugin):
         self.config.add({
             'auto': False,
             'force': False,
-            'count': 4,
+            'count': 4,  # can be overridden with cli args
             'separator': ', ',
             'whitelist': 'wlg',  # wlg, beets or custom path
         })
@@ -81,6 +81,9 @@ class WhatLastGenre(BeetsPlugin):
             '-n', '--dry', dest='dry', action='store_true',
             default=False, help='don\'t save metadata (default: False)')
         cmds.parser.add_option(
+            '-l', '--tag-limit', metavar='N', type=int, dest='count',
+            default=4, help='max. number of genre tags (default: 4)')
+        cmds.parser.add_option(
             '-u', '--update-cache', dest='cache', action='store_true',
             default=False, help='force update cache (default: False)')
         cmds.func = self.commanded
@@ -93,6 +96,8 @@ class WhatLastGenre(BeetsPlugin):
 
         if opts.force:
             self.config['force'] = True
+
+        self.wlg.conf.args.tag_limit = opts.count
 
         albums = lib.albums(decargs(args))
         i = 1
