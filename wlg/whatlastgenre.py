@@ -73,9 +73,10 @@ class WhatLastGenre(object):
                     and self.conf.get('wlg', 'whitelist'):
                 path = self.conf.get('wlg', 'whitelist')
             elif os.path.exists(os.path.join(self.conf.path, 'genres.txt')):
-                path = os.path.join(self.conf.path, 'genres.txt')
+                path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'genres.txt')
             else:
-                path = 'data/genres.txt'
+                script_dir = os.path.dirname(os.path.realpath(__file__))
+                path = os.path.join(script_dir, 'data', 'genres.txt')
         whitelist = set(read_datafile(path))
         if not whitelist:
             raise RuntimeError('empty whitelist: %s' % path)
@@ -94,7 +95,8 @@ class WhatLastGenre(object):
             elif os.path.exists(os.path.join(self.conf.path, 'tags.txt')):
                 path = os.path.join(self.conf.path, 'tags.txt')
             else:
-                path = 'data/tags.txt'
+                script_dir = os.path.dirname(os.path.realpath(__file__))
+                path = os.path.join(script_dir, 'data', 'tags.txt')
         tagsfile = {}
         section = None
         for line in read_datafile(path):
